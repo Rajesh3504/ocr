@@ -3,4 +3,4 @@ streamlit
 pillow
 numpy
 openai
-cv2
+opencv-python

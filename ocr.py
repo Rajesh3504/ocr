@@ -7,7 +7,7 @@ import cv2  # OpenCV for camera input
 
 # Set your OpenAI API key here
 openai.api_key = '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'
-
+client = OpenAI(api_key=st.secrets["openai.api_key"])
 # title
 st.title("Easy OCR - Extract Text from Images and ChatGPT Search")
 

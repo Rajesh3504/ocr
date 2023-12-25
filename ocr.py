@@ -1,75 +1,37 @@
-import easyocr as ocr
+from openai import OpenAI
+import streamlit as st
 
-import streamlit as st  # Web App
-from PIL import Image  # Image Processing
-import numpy as np  # Image Processing
-import openai  # OpenAI GPT API
-import cv2  # OpenCV for camera input
+st.title("ChatGPT-like clone")
 
-# Set your OpenAI API key here
-openai.api_key = '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'
-client = OpenAI(api_key=st.secrets["openai.api_key"])
-# title
-st.title("Easy OCR - Extract Text from Images and ChatGPT Search")
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
+if "openai_model" not in st.session_state:
+    st.session_state["openai_model"] = "gpt-3.5-turbo"
 
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
-st.markdown("")
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
 
-# Input selection: Camera or File
-input_option = st.radio("Select Input Source:", ["Camera", "File"])
+if prompt := st.chat_input("What is up?"):
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    with st.chat_message("user"):
+        st.markdown(prompt)
 
-if input_option == "Camera":
-    # Camera input
-    cap = cv2.VideoCapture(0)
-
-    if st.button("Capture Frame"):
-        ret, frame = cap.read()
-        input_image = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-
-elif input_option == "File":
-    # File input
-    image = st.file_uploader(label="Upload your image here", type=['png', 'jpg', 'jpeg'])
-
-    if image is not None:
-        input_image = Image.open(image)
-
-# Load OCR model
-@st.cache
-def load_model():
-    reader = ocr.Reader(['en'], model_storage_directory='.')
-    return reader
-
-reader = load_model()  # Load model
-
-if 'input_image' in locals():
-    st.image(input_image)  # Display image
-
-    with st.spinner("Please wait, processing..."):
-
-        result = reader.readtext(np.array(input_image))
-
-        result_text = []  # Empty list for results
-
-        for text in result:
-            result_text.append(text[1])
-
-        st.write("Extracted Text:")
-        st.write(result_text)
-
-        # Join the extracted text for ChatGPT query
-        query = " ".join(result_text)
-
-        # Use ChatGPT to get a response
-        if query:
-            st.write("ChatGPT Response:")
-            response = openai.Completion.create(
-                engine="text-davinci-002",
-                prompt=query,
-                max_tokens=150
-            )
-            st.write(response.choices[0].text)
-
-# Release camera when done
-if input_option == "Camera":
-    cap.release()
+    with st.chat_message("assistant"):
+        message_placeholder = st.empty()
+        full_response = ""
+        for response in client.chat.completions.create(
+            model=st.session_state["openai_model"],
+            messages=[
+                {"role": m["role"], "content": m["content"]}
+                for m in st.session_state.messages
+            ],
+            stream=True,
+        ):
+            full_response += (response.choices[0].delta.content or "")
+            message_placeholder.markdown(full_response + "▌")
+        message_placeholder.markdown(full_response)
+    st.session_state.messages.append({"role": "assistant", "content": full_response})

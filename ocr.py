@@ -1,19 +1,74 @@
-import streamlit as st
-import numpy as np
-import pytesseract 
-from PIL import Image 
+import easyocr as ocr  # OCR
+import streamlit as st  # Web App
+from PIL import Image  # Image Processing
+import numpy as np  # Image Processing
+import openai  # OpenAI GPT API
+import cv2  # OpenCV for camera input
 
-pytesseract.pytesseract.tesseract_cmd = 'C:\\Program Files\\Tesseract-OCR\\tesseract.exe'
+# Set your OpenAI API key here
+openai.api_key = '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'
 
-st.title("Our OCR APP")
-st.text("Upload a image which contains English Text")
+# title
+st.title("Easy OCR - Extract Text from Images and ChatGPT Search")
 
-upload_image=st.sidebar.file_uploader('choose a image input for convertion',type=["jpg","png","jpeg"])
-if upload_image is not None:
-    img=Image.open(upload_image)
-    st.image(upload_image)
-    
-    if st.button("Extract Text"):
-        st.write("Extracted Text")
-        output_text=pytesseract.image_to_string(img)
-        st.write(output_text)
+
+
+st.markdown("")
+
+# Input selection: Camera or File
+input_option = st.radio("Select Input Source:", ["Camera", "File"])
+
+if input_option == "Camera":
+    # Camera input
+    cap = cv2.VideoCapture(0)
+
+    if st.button("Capture Frame"):
+        ret, frame = cap.read()
+        input_image = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+
+elif input_option == "File":
+    # File input
+    image = st.file_uploader(label="Upload your image here", type=['png', 'jpg', 'jpeg'])
+
+    if image is not None:
+        input_image = Image.open(image)
+
+# Load OCR model
+@st.cache
+def load_model():
+    reader = ocr.Reader(['en'], model_storage_directory='.')
+    return reader
+
+reader = load_model()  # Load model
+
+if 'input_image' in locals():
+    st.image(input_image)  # Display image
+
+    with st.spinner("Please wait, processing..."):
+
+        result = reader.readtext(np.array(input_image))
+
+        result_text = []  # Empty list for results
+
+        for text in result:
+            result_text.append(text[1])
+
+        st.write("Extracted Text:")
+        st.write(result_text)
+
+        # Join the extracted text for ChatGPT query
+        query = " ".join(result_text)
+
+        # Use ChatGPT to get a response
+        if query:
+            st.write("ChatGPT Response:")
+            response = openai.Completion.create(
+                engine="text-davinci-002",
+                prompt=query,
+                max_tokens=150
+            )
+            st.write(response.choices[0].text)
+
+# Release camera when done
+if input_option == "Camera":
+    cap.release()

@@ -1,0 +1,6 @@
+easyocr
+streamlit
+pillow
+numpy
+openai
+cv2
